@@ -1,0 +1,315 @@
+<!DOCTYPE HTML>
+<!--
+	Strata by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>Data Warehouse Design</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+	</head>
+	<body class="is-preload">
+
+		<!-- Header -->
+			<header id="header">
+				<div class="inner">
+					<a class="image avatar"><img src="images/Moi.jpg" alt="" /></a>
+					<h1><strong>I am Shulian</strong>, a data-driven<br />
+					 digital marketing enthusiast<br /></h1>
+				    <p></p>
+                    <p>
+                    <a href="index.html">Home</a><br />
+                    <a href="index.html#projects">Analytics Projects</a><br />
+                    <a href="index.html#visualization">Data Visualization</a><br />
+                    <a href="index.html#contact">Contact Me</a>
+                    </p>
+				</div>
+			</header>
+
+		<!-- Main -->
+			<div id="main">
+
+				<!-- One -->
+					<section id="content">
+						<header class="major">
+							<h2>Country Club Data Warehouse Design in MySQL</h2>
+						</header>    
+				        
+                        <div class="box alt">
+								<div class="row gtr-50 gtr-uniform">
+									<div class="col-12"><span class="image fit"><img src="images/cc1.jpg" alt="" /></span></div>
+				                </div>
+				        </div>
+                       
+				        <h2>Summary</h2>	
+                        <ul>
+                            <li>Goal: Design and create a <u><strong>data warehouse</strong></u> for Blue Hill Country Club’s database</li>
+                            <li>Data: Membership and transactional data related to one year of operations of Blue Hill Country Club</li>
+                            <li>Tool: <u><strong>MySQL</strong></u></li>
+                            
+                            <li>Steps:
+                                <ol>
+                                    <li>Build two versions of data warehouses both containing relevant membership and revenue data, one in <u><strong>long shape</strong></u> and the other in <u><strong>wide shape</strong></u></li>
+                                    <li>Create <u><strong>ad-hoc analytics queries</strong></u> using the data warehouse built in the first step to answer relevant business questions the management team may be interested in.</li>
+                                </ol>
+                            </li>
+                        </ul>
+                        
+                        <h2>Scenario</h2>
+                        <p>In this project, my task was to design and create a data warehouse for Blue Hill Country Club’s database. The goal was to design a data warehouse that would add value to the organization in terms of ease of use (for a technically competent user but not necessarily a programmer) and efficacy in identifying relevant patterns and trends.</p>
+                        
+                        <h2>Data</h2>
+                        <p>The data I have access to is the membership and transactional data related to one year of operations of Blue Hill Country Club. Below is the EER schema of this database as well as the simple description of each table. </p>
+                        <img src="images/ccschema.png" alt="" />
+                        
+                        <h4>Membership data tables: </h4>
+                        <ul>
+                            <li>memberships – one record per membership</li>
+                            <li>members - one record per person (multiple family members can be included on the same membership account) </li>
+                        </ul>
+                        <h4>Revenue data tables: </h4>
+                        <ul>
+                            <li>dining – transaction records from dining room </li>
+                            <li>golf – transaction records from golf course</li>
+                            <li>pool – transaction records from pool</li>
+                            <li>tennis – transaction records from tennis courts </li>
+                            <li>other - transaction records from miscellaneous activities</li>
+                        </ul>
+                        <h4>Other data tables: </h4>
+                        <ul>
+                            <li>promoone – list of members who signed up for one of the club’s promotional offers</li>
+                            <li>promotwo - list of members who signed up for the second of the club’s promotional offers </li>
+                            <li>special - A series of Boolean variables indicating whether the member attended one of 4 special functions in 2018. </li>                            
+                        </ul>
+                        
+                        <h2>Data Warehouse Design</h2>
+                        <p>After exploring the dataset, I decided to design a data warehouse that includes the following information in order for future users to easily extract relevant data and identify patterns about memberships and revenue: </p>
+                        <ul>
+                            <li>Membership unique identifier: Member ID</li>
+                            <li>Membership basic information: Membership Type, Years of Membership, Number of Family, Number of Children</li>
+                            <li>Revenue data: Revenue type (Dining, Pool, Golf, Tennis, Other), Revenue Amount</li>
+                            <li>Promotion data: PromoOne, PromoTwo, Other Special Events</li>
+                        </ul>
+                        <p>For future different use purposes, I designed two versions of data warehouse containing the same information: a long shape and a wide shape format.</p>
+                        <pre><code>##### Long data warehouse #####
+
+CREATE TABLE revenue_long AS
+SELECT Member_Number, SUM(Revenue) AS Revenue, Revenue_Type
+FROM
+(
+SELECT Member_Number, Total AS Revenue, "Dining" AS Revenue_Type FROM dining
+UNION ALL
+SELECT Member_Number, Amount AS Revenue, "Golf" AS Revenue_Type FROM Golf
+UNION ALL
+SELECT Member_Number, Amount AS Revenue, "Pool" AS Revenue_Type FROM Pool
+UNION ALL
+SELECT Member_Number, Amount AS Revenue, "Tennis" AS Revenue_Type FROM Tennis
+UNION ALL
+SELECT Member_Number, Amount AS Revenue, "Other" AS Revenue_Type FROM Other
+) AS members
+GROUP BY Member_Number, Revenue_Type;
+
+CREATE TABLE dw_long AS
+SELECT memberships.member_number, membership_type,
+		(2019 - Year_Joined) AS Years,
+		COALESCE(Number_Family, 0) AS Number_Family,
+		COALESCE(Number_Children,0) AS Number_Children,
+		Revenue, Revenue_Type, 
+		CASE WHEN promoone.Member_Number IS NULL THEN 0 ELSE 1 END AS PromoOne,
+		CASE WHEN promotwo.Member_Number IS NULL THEN 0 ELSE 1 END AS PromoTwo,
+        COALESCE(`Private Function`,0) AS Private_Function,
+        COALESCE(`4th of July`,0) AS July_Fourth,
+        COALESCE(Thanksgiving,0) AS Thanksgiving,
+        COALESCE(`Easter Brunch`,0) AS Easter_Brunch
+FROM memberships 
+	LEFT JOIN revenue_long ON memberships.Member_Number = revenue_long.Member_Number
+    LEFT JOIN promoone ON memberships.Member_Number = promoone.Member_Number
+    LEFT JOIN promotwo ON memberships.Member_Number = promotwo.Member_Number
+    LEFT JOIN special ON memberships.Member_Number = special.Member_Number
+    LEFT JOIN (SELECT Member_Number, COUNT(*) AS Number_Family
+				FROM members
+                GROUP BY Member_Number) AS family
+			ON memberships.Member_Number = family.Member_Number
+    LEFT JOIN (	SELECT Member_Number, COUNT(*) AS Number_Children 
+				FROM members
+				WHERE Relationship_to_Member = "Child"
+				GROUP BY Member_Number) AS children
+		ON memberships.Member_Number = children.Member_Number
+ORDER BY memberships.Member_Number; </code></pre>
+                         <p>Long Shape: one record per person</p>
+                         <img src="images/ccdw1.jpg" alt="" />
+                         <p></p>
+                         <pre><code>##### Wide data warehouse #####
+
+CREATE TABLE revenue AS
+SELECT Member_Number, SUM(Pool) AS Pool, SUM(Golf) AS Golf, SUM(Tennis) AS Tennis,
+		SUM(Dining) AS Dining, SUM(Other) AS Other
+FROM
+(SELECT Member_Number, Total AS Dining, 0 AS Golf, 0 AS Pool, 0 AS Tennis, 0 AS Other FROM dining
+UNION ALL
+SELECT Member_Number, 0 AS Dining, Amount AS Golf, 0 AS Pool, 0 AS Tennis, 0 AS Other FROM Golf
+UNION ALL
+SELECT Member_Number, 0 AS Dining, 0 AS Golf, Amount AS Pool, 0 AS Tennis, 0 AS Other FROM Pool
+UNION ALL
+SELECT Member_Number, 0 AS Dining, 0 AS Golf, 0 AS Pool, Amount AS Tennis, 0 AS Other FROM Tennis
+UNION ALL
+SELECT Member_Number, 0 AS Dining, 0 AS Golf, 0 AS Pool, 0 AS Tennis, Amount AS Other
+FROM Other) AS members
+GROUP BY Member_Number;
+
+CREATE TABLE dw AS
+SELECT memberships.member_number, membership_type,
+		(2019 - Year_Joined) AS Years,
+		COALESCE(Number_Family, 0) AS Number_Family,
+		COALESCE(Number_Children,0) AS Number_Children,
+		Pool, Golf, Tennis, Dining, Other, 
+		CASE WHEN promoone.Member_Number IS NULL THEN 0 ELSE 1 END AS PromoOne,
+		CASE WHEN promotwo.Member_Number IS NULL THEN 0 ELSE 1 END AS PromoTwo,
+        COALESCE(`Private Function`,0) AS Private_Function,
+        COALESCE(`4th of July`,0) AS July_Fourth,
+        COALESCE(Thanksgiving,0) AS Thanksgiving,
+        COALESCE(`Easter Brunch`,0) AS Easter_Brunch
+FROM memberships 
+	LEFT JOIN revenue ON memberships.Member_Number = revenue.Member_Number
+    LEFT JOIN promoone ON memberships.Member_Number = promoone.Member_Number
+    LEFT JOIN promotwo ON memberships.Member_Number = promotwo.Member_Number
+    LEFT JOIN special ON memberships.Member_Number = special.Member_Number
+    LEFT JOIN (SELECT Member_Number, COUNT(*) AS Number_Family
+				FROM members
+                GROUP BY Member_Number) AS family
+			ON memberships.Member_Number = family.Member_Number
+    LEFT JOIN (	SELECT Member_Number, COUNT(*) AS Number_Children 
+				FROM members
+				WHERE Relationship_to_Member = "Child"
+				GROUP BY Member_Number) AS children
+		ON memberships.Member_Number = children.Member_Number
+ORDER BY memberships.Member_Number; </code></pre>                       
+                        <p>Wide Shape: one record per membership</p>
+                        <img src="images/ccdw2.jpg" alt="" />
+                        <p></p>
+                        <h2>Analytics Queries</h2>
+                        <p>Using the designed data warehouse, I wrote the following analytics queries to explore some business questions that the management may be interested in: </p>
+                        <h3>Query 1</h3>
+                        <p>The management team might want to know different revenue patterns for different membership type groups. My approach is to aggregate the membership type to get their average spending on different activities.</p>
+                        <pre><code> # Query1                        
+
+SELECT 
+    Membership_Type,
+    COUNT(*),
+    SUM(Pool+golf+Tennis+Dining+Other) AS total_revenue,
+    AVG(Pool+golf+Tennis+Dining+Other) AS avg_revenue,
+    AVG(Dining),AVG(Golf),AVG(Tennis),AVG(Pool),AVG(Other)
+FROM
+    dw
+GROUP BY Membership_Type
+ORDER BY COUNT(*) DESC; </code></pre> 
+                        <p>From the table below we can see that Couples spent more on dining on average, family spent more on pool activities, while retirees spent more on golf and tennis.</p>
+                        <img src="images/ccquery1.jpg" alt="" />
+                        
+                        <h3>Query 2</h3>
+                        <p>The management team might also want to explore the revenue difference of different family structures (# of members, w/o children, # of children). The following query is to aggregate the number of family and children info to get the average spending of each family structure type.</p>
+                        <pre><code> # Query2                       
+
+SELECT 
+    Number_Family,
+    Number_Children,
+    COUNT(*),
+    AVG(Pool+golf+Tennis+Dining+Other) AS avg_amount
+FROM
+    dw
+GROUP BY Number_Family, Number_Children
+ORDER BY avg_amount DESC;</code></pre>   
+                        <p>From the table below we can see that membership with 2 members without children and individual members spent on average the most.</p>
+                        <img src="images/ccquery2.jpg" alt="" />
+                                               
+                        <h3>Query 3</h3>
+                        <p>The purpose of next query is to analyze different special function patterns for different membership type groups. </p>
+                        <pre><code> # Query3
+SELECT 
+    Membership_Type, COUNT(*),
+    AVG(Private_Function), AVG(July_Fourth),AVG(Thanksgiving), AVG(Easter_Brunch)
+FROM
+    dw
+GROUP BY Membership_Type
+ORDER BY COUNT(*) DESC; </code></pre>
+                        <p>From the table we can see that Family’s attendance for Private Function, 4th of July and Easter Brunch were the highest among all groups. Retirees attended Thanksgiving the most. </p>
+                        <img src="images/ccquery3.jpg" alt="" />
+
+                        <h3>Query 4</h3>
+                        <p>Finally, I wanted to explore the marketing effects of Promotions 1&2 on different activities using the following query. </p>
+                        <pre><code> # promo 1, 2
+
+SELECT 
+    membership_type, PromoOne,AVG(Dining),AVG(Golf),AVG(Tennis),AVG(Pool),AVG(Other)
+FROM
+    dw
+GROUP BY membership_type , PromoOne
+ORDER BY membership_type , PromoOne;
+
+SELECT 
+    membership_type,PromoTwo,AVG(Dining),AVG(Golf),AVG(Tennis),AVG(Pool),AVG(Other)
+FROM
+    dw
+GROUP BY membership_type , PromoTwo
+ORDER BY membership_type , PromoTwo;</code></pre>
+                        <p>From the table we can see that members who signed up for Promo One had largely increased dining revenue.</p>
+                        <img src="images/ccquery4.jpg" alt="" />
+                        <p>The following chart shows more clearly the promotion effects on dining. </p>
+                        <img src="images/ccpromo1.jpg" alt="" />
+                        <p>As for Promotion2, Members who signed up for Promo Two had greatly increased Other Revenue.</p>
+                        <img src="images/ccquery5.jpg" alt="" />
+                        <img src="images/ccpromo2.jpg" alt="" />
+
+                        <p></p>
+                        <p><i>Key Words: SQL, Data Warehouse, ETL, Database Management, Ad-hoc Querying</i></p>
+				
+                        <ul class="actions">
+							<li><a href="index.html" class="button primary">Back to Home</a></li>
+                            <li><a href="projects.html" class="button primary">View Other Projects</a></li>
+						</ul>
+		           <hr /> 
+
+             <!-- Two -->
+					<section id="comment">
+						<h2>Comments</h2>
+                        <div class="col-8 col-12-small">
+								<form method="post" action="#">
+									<div class="row gtr-uniform gtr-50">
+										<div class="col-6 col-12-xsmall"><input type="text" name="name" id="name" placeholder="Name" /></div>
+										<div class="col-6 col-12-xsmall"><input type="email" name="email" id="email" placeholder="Email" /></div>
+										<div class="col-12"><textarea name="message" id="message" placeholder="Message" rows="4"></textarea></div>
+									</div>
+								</form>
+								<ul class="actions">
+									<li><input type="submit" value="Send Message" /></li>
+								</ul>
+				        </div>
+					</section>        
+                
+		<!-- Footer -->
+			<footer id="footer">
+				<div class="inner">
+					<ul class="icons">
+				        <li><a href="http://www.linkedin.com/in/shulianguan" class="icon brands fa-linkedin"><span class="label">LinkedIn</span></a></li>
+                        <li><a href="documents/Shulian.Guan.Resume.Oct2020.pdf" class="icon solid fa-file-pdf"><span class="label">Resume</span></a></li>
+						<li><a href="mailto:shulianguan@gmail.com" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
+					</ul>
+					<ul class="copyright">
+						<li>&copy; Shulian Guan</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+					</ul>
+				</div>
+			</footer>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.poptrox.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

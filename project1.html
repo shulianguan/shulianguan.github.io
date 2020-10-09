@@ -1,0 +1,187 @@
+<!DOCTYPE HTML>
+<!--
+	Strata by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>Wine Retailer Email Marketing</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+	</head>
+	<body class="is-preload">
+
+		<!-- Header -->
+			<header id="header">
+				<div class="inner">
+					<a class="image avatar"><img src="images/Moi.jpg" alt="" /></a>
+					<h1><strong>I am Shulian</strong>, a data-driven<br />
+					 digital marketing enthusiast<br /></h1>
+				    <p></p>
+                    <p>
+                    <a href="index.html">Home</a><br />
+                    <a href="index.html#projects">Analytics Projects</a><br />
+                    <a href="index.html#visualization">Data Visualization</a><br />
+                    <a href="index.html#contact">Contact Me</a>
+                    </p>
+				</div>
+			</header>
+
+		<!-- Main -->
+			<div id="main">
+
+				<!-- One -->
+					<section id="content">
+						<header class="major">
+							<h2>Wine Retailer Email Marketing Evaluation</h2>
+						</header>    
+				        
+                        <div class="box alt">
+								<div class="row gtr-50 gtr-uniform">
+									<div class="col-12"><span class="image fit"><img src="images/wine2.jpg" alt="" /></span></div>
+				                </div>
+				        </div>
+                       
+				        <h2>Summary</h2>	
+                        <ul>
+                            <li>Goal: Evaluate whether an email promotion is effective & who to target with email campaign</li>
+
+                            <li>Data: Experiment data on email promotion, customers’ past purchase behavior data</li>
+
+                            <li>Methodology:
+                                <ol>
+                                    <li>Use <u><strong>linear regression</strong></u> to evaluate the average causal effects (ACE) of email treatment on purchase;</li>
+                                    <li>Perform <u><strong>slice and dice analysis</strong></u> to evaluate the evaluate the conditional causal effects (CCE) of email treatment on purchase;</li>
+                                    <li>Build a <u><strong>causal forest</strong></u> model to predict the individual-level customer purchase-lift caused by email campaign</li>
+                                </ol></li>
+                            <li>Result: Able to identify email targeted segmentation based on past behaviors. Also, an individual-level scoring system is built in order to target email cost-effective customer set.
+                            </li>
+                            </ul>
+                        
+                        <h2>Scenario</h2>
+                        <p>In this project, I worked for a wine retailer that is running email marketing experiments to evaluate offers prior to sending the offers to a broader set of customers. In this experiment,  the team examined the impact of an email that was intended to drive purchases. The goal of my analysis is to evaluate whether the promotion is effective and who to target with the email campaign.</p>
+                        
+                        <h2>Data</h2>
+                        <p>The data I have is the experiment data (whether the customers received email treatment and their responses), and the customers’ historical purchase behavior data(amount purchased of specific wine types in past, days since last visit, etc).</p>
+                        <img src="images/winedata1.jpg" alt="" />
+
+				        <p>Also, the analytics team estimates the average cost of sending an email of approximately 10 cents. And while margins vary on products, the team has been using a simple 30% margin rule to apply to all products.</p>
+                        
+                        <h2>Analysis</h2>
+                        <h3>Step1. Average causal effect evaluation with lm</h3>
+                        <p>First, I depict the average effects in table and graph form as follows. In this project, I focus on the purchase variable as the response variable.</p>
+                        <img src="images/winedata2.jpg" alt="" />
+                        <img src="images/winedata3.jpg" alt="" />
+                        <p>To evaluate the average causal effect on purchases, I use run linear regression(lm) in R as follows.</p>
+                        <pre><code>##### Step 1: Linear Regression #####
+
+# use lm to evaluate the average causal effect on purchases
+summary(lm(purch~group,data=d)) 
+# adding controls separating emails
+summary(lm(purch~group+chard+sav_blanc+syrah+cab+last_purch+visits,data=d)) </code></pre>
+                        <img src="images/winedata4.jpg" alt="" />
+                        <p>From the regression result I can conclude that Email effect is highly significant, and the effect size is $1.35 purchase lift by sending email. For control group, the average purchase amount is $12.77, and for email group is $14.12.</p>
+                        
+                        <h3>Step2. Conditional causal effect evaluation with Slice and Dice Analysis</h3>
+                        <p>Email promotion may be more effective to certain segments than to others. For example, from the data I noticed that the email seems to produce a stronger effect on purchases for more recent buyers. Therefore, in this part I am going to use Slicing and Dicing to evaluation the conditional causal effects of email promotion on purchase, that is, to find out if sending email is more effective to certain groups.</p>
+                        <p>I slice the customers based on the baseline variables in the dataset, including Chard Purchase, Sav_blanc Purchase, Cab Purchase, Last Purchase - recency 45 days, Past Purchase – greater than $180. </p>
+                        <pre><code>##### Step 2: Slice and Dice #####
+                        
+#Slice based on Sav_blanc Purchase
+dt = data.table(d)
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group,savpur)]
+dagg
+ggplot(aes(fill=group,y=purch,x=savpur,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg) + geom_bar(position=dodge,stat="identity") + geom_errorbar(position=dodge) + labs(x="Sav_blanc Purchase",y="Purchases")
+summary(lm(purch~group*savpur,data=d)) ## interaction coef significant**</code></pre>
+                        <p>From the graghs below, we can see that Sav purchase, recency and past purchase amount are three significant slices. That is, sending email to Sav_blanc buyers, recent buyers, and high-spent buyers results in a higher purchase lift than to other segments. Therefore, it’s more effective to send email promotion to these segments.</p>
+                        <img src="images/winedata5.jpg" alt="" />
+                
+                        <h3>Step3. Conditional causal effect evaluation with Causal Forest</h3>
+                        <p>In this part I will leverage a Machine Learning method, Causal Forests, to further the causal effect study. Causal forests are random forests designed to categorize customers according to their treatment effect in an experiment. The customers in each leaf are assumed to have homogeneous treatment effects, with heterogeneous treatment effects between leaves.It’s an alternative to regression for identifying heterogeneous treatment effects and scoring customers based on predicted treatment effect uplift. It works well with a large number of baseline variables, and will fit non-linear relationships between baseline variables and uplift. </p>
+                        <pre><code>##### Step 3: Causal forest #####
+
+# Causal forest: use the whole dataset as training data
+treat <- d$group =='email' 
+response <- d$purch
+baseline <- d[, c("chard", "sav_blanc", "syrah", "cab","last_purch", "visits")]
+cf <- causal_forest(baseline, response, treat,seed = 66)
+
+# predict causal effect estimates for each individual in the dataset
+pur <- predict(cf, d[,c(7,8,9,10,12,13)], estimate.variance = TRUE)[,1]
+hist(pur, 
+     main="Histogram of Purchase Lift", 
+     xlab="Purchase Lift for Email", ylab="Customers")
+abline(v=coef(lm(purch~group,data=d))[2],col=2) 
+abline(v=average_treatment_effect(cf, method="AIPW")[1],col=4)</code></pre>
+                        <p>From the histogram below, we can see the distribution of the predicted purchase lift from email promotion on purchase for all the customers in the dataset, with $1.28 as the average individual-level conditional causal effect, which is close to average causal effect estimated earlier $1.35.</p>
+                        <img src="images/winedata6.jpg" alt="" />
+                        
+                        <h4>Step4. Scoring system for Targeted segment</h4>
+                        <p>Finally, I use the individual-level predicted purchase lift estimated by the causal forests model along with the margin and cost information to score each customer.</p>
+                        <img src="images/winedata7.jpg" alt="" />
+                        <p>Then I get a list of customer scores with indicators on whether to send emails or not.</p>
+                        <img src="images/winedata8.jpg" alt="" />
+                        <p></p>
+                        <p>From the dataset, 55.25% of all customers fall into targeted group, with the summaries(mean) of the baseline variables for the targeted and non-targeted groups shown as below. It’s not difficult to see that customers in the targeted group are obviously Chardonnay lovers as well as recent buyers.</p>
+                        <img src="images/winedata9.jpg" alt="" />
+                        <p></p>
+                        <h2>Final Report</h2>
+                        <div class="box alt">
+								<div class="row gtr-50 gtr-uniform">
+									<div class="col-12"><span><img src="images/wineslides.jpg" alt="" /></span></div>
+				                </div>
+				        </div>
+                        <ul class="actions">
+							<li><a href="https://1drv.ms/p/s!AisVo4xptCcdbsBtESg9YRUc7U4?e=yagPdp" class="button">View Full Slides</a></li>
+						</ul>
+                        <p><i>Key Words: R, Regression, Causal Forests, Slice and Dice, Incrementality, Experiments, Email Marketing</i></p>
+				
+                        <ul class="actions">
+							<li><a href="index.html" class="button primary">Back to Home</a></li>
+                            <li><a href="projects.html" class="button primary">View Other Projects</a></li>
+						</ul>
+		           <hr /> 
+
+             <!-- Two -->
+					<section id="comment">
+						<h2>Comments</h2>
+                        <div class="col-8 col-12-small">
+								<form method="post" action="#">
+									<div class="row gtr-uniform gtr-50">
+										<div class="col-6 col-12-xsmall"><input type="text" name="name" id="name" placeholder="Name" /></div>
+										<div class="col-6 col-12-xsmall"><input type="email" name="email" id="email" placeholder="Email" /></div>
+										<div class="col-12"><textarea name="message" id="message" placeholder="Message" rows="4"></textarea></div>
+									</div>
+								</form>
+								<ul class="actions">
+									<li><input type="submit" value="Send Message" /></li>
+								</ul>
+				        </div>
+					</section>        
+                
+		<!-- Footer -->
+			<footer id="footer">
+				<div class="inner">
+					<ul class="icons">
+				        <li><a href="http://www.linkedin.com/in/shulianguan" class="icon brands fa-linkedin"><span class="label">LinkedIn</span></a></li>
+                        <li><a href="documents/Shulian.Guan.Resume.Oct2020.pdf" class="icon solid fa-file-pdf"><span class="label">Resume</span></a></li>
+						<li><a href="mailto:shulianguan@gmail.com" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
+					</ul>
+					<ul class="copyright">
+						<li>&copy; Shulian Guan</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+					</ul>
+				</div>
+			</footer>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.poptrox.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

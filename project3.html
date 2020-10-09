@@ -1,0 +1,412 @@
+<!DOCTYPE HTML>
+<!--
+	Strata by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>Toy Horse Revitalization</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+	</head>
+	<body class="is-preload">
+
+		<!-- Header -->
+			<header id="header">
+				<div class="inner">
+					<a class="image avatar"><img src="images/Moi.jpg" alt="" /></a>
+					<h1><strong>I am Shulian</strong>, a data-driven<br />
+					 digital marketing enthusiast<br /></h1>
+				    <p></p>
+                    <p>
+                    <a href="index.html">Home</a><br />
+                    <a href="index.html#projects">Analytics Projects</a><br />
+                    <a href="index.html#visualization">Data Visualization</a><br />
+                    <a href="index.html#contact">Contact Me</a>
+                    </p>
+				</div>
+			</header>
+
+		<!-- Main -->
+			<div id="main">
+
+				<!-- One -->
+					<section id="content">
+						<header class="major">
+							<h2>Toy Horse Product Line Revitalization</h2>
+						</header>    
+				        
+                        <div class="box alt">
+								<div class="row gtr-50 gtr-uniform">
+									<div class="col-12"><span class="image fit"><img src="images/toyhorse1.jpg" alt="" /></span></div>
+				                </div>
+				        </div>
+                       
+				        <h2>Summary</h2>	
+                        <ul>
+                            <li>Goal: Provide product portfolio revitalization recommendations to a toy horse company</li>
+
+                            <li>Data: Conjoint data of 12 product profiles responded by 200 individuals</li>
+
+                            <li>Methodology:
+                                <ol>
+                                    <li>Use Regression to estimate the conjoint model at the individual level ;</li>
+                                    <li>Conduct <u><strong>Benefit Segmentation</strong></u> via <u><strong>Cluster Analysis</strong></u> of Conjoint Part-Utilities;</li>
+                                    <li>Conduct <u><strong>a priori segmentation</strong></u> using the variables gender and age;</li>
+                                    <li>Simulate market shares for different product-line scenarios.</li>
+                                </ol></li>
+                        </ul>
+                        
+                        <h2>Scenario</h2>
+                        <p>In this project, I worked for a relatively small toy company called EarlyRiders. The company had a recent management change and realized that their product set was underperforming. They currently offer two products and one in particular was not doing well. The management team decided to revitalize their product portfolio based on the opinions of potential end-users. For this purpose, a <u><strong>conjoint analysis</strong></u> was run by the company, and my goal was to analyze the conjoint data and provide product line adjustment recommendations to the management team. </p>
+                        
+                        <h2>Data</h2>
+                        <p>The raw data I have is the conjoint data of 200 individuals consisting of 12 product profiles out of 16. These individuals are made up of parents of 2-4 year old kids who planned to purchase a toy horse. 
+                        <p>The conjoint study examined four attributes: price, height, motion, and style. The levels for retail price are $119.99 and $139.99, for height are 18" and 26", for motion are rocking or bouncing, and for style are glamorous or racing.</p>
+
+                        <p>A screenshot of the conjoint data and the profile data shown as below.</p>
+                        
+                        <img src="images/toydata1.jpg" alt="" />
+                        <p></p>
+                        <img src="images/toydata2.jpg" alt="" />
+                        
+                        <p>In addition to the conjoint data, the gender and age of the child was recorded (Gender=1 if Female, 0 if Male; Age=0 if 2 years old, 1 if 3-4).</p>                        
+                        <img src="images/toydata3.jpg" alt="" />
+                        <p></p>
+                        
+                        <h2>Analysis</h2>
+                        <h3>Step1. Post-hoc Segmentation via Cluster Analysis of Conjoint Part-Utilities</h3>
+                        <p>First, I ran regression in R to estimate the conjoint part-utilities at the individual level. The distribution of the part-utilities for each of the four attributes are shown in the graph below.</p>
+                        <pre><code>##### Produce part-utilities #####
+
+coeflist=list()
+for(i in 1:200) {
+    reg = lm(ratings~factor(price)+factor(size)+factor(motion)+factor(style), 
+             data=conjointData[conjointData$ID==i,])
+    coeflist[[i]] = reg$coefficients
+}
+partworths = as.data.frame(do.call(rbind, coeflist))
+colnames(partworths)[2:5] = c('price119.99', 'size26inc','motionRocking', 'styleGlamour')
+head(partworths)
+
+par(mfrow=c(2,2))
+par(mar=c(2,2,2,2))
+for(i in 2:length(partworths)){
+    hist(partworths[,i], main=names(partworths)[i])
+}
+</code></pre>
+                        <img src="images/toydata4.jpg" alt="" />
+                        <p></p>
+                        <img src="images/toydata5.jpg" alt="" />
+                        
+                        <p>With the individual-level part-utilities data, I was the able to conduct a Cluster Analysis. In order to find out the optimal number of clusters, I applied the Elbow Rule, which is used within sum of squared errors, and the Silhouette Rule, which measures the overall performance. Both the graphs below show that 3 clusters seem to be a good choice.</p>
+                        <pre><code>##### Choosing the optimal number of clusters #####
+
+library(gridExtra)
+
+clustTest = function(toClust,print=TRUE,scale=TRUE,maxClusts=15,seed=12345,nstart=20,iter.max=100){
+    if(scale){ toClust = scale(toClust);}
+    set.seed(seed);   # set random number seed before doing cluster analysis
+    wss <- (nrow(toClust)-1)*sum(apply(toClust,2,var))
+    for (i in 2:maxClusts) wss[i] <- sum(kmeans(toClust,centers=i,nstart=nstart,iter.max=iter.max)$withinss)
+    ##gpw essentially does the following plot using wss above. 
+    #plot(1:maxClusts, wss, type="b", xlab="Number of Clusters",ylab="Within groups sum of squares")
+    gpw = fviz_nbclust(toClust,kmeans,method="wss",iter.max=iter.max,nstart=nstart,k.max=maxClusts) #alternative way to get wss elbow chart.
+    pm1 = pamk(toClust,scaling=TRUE)
+    ## pm1$nc indicates the optimal number of clusters based on 
+    ## lowest average silhoutte score (a measure of quality of clustering)
+    #alternative way that presents it visually as well.
+    gps = fviz_nbclust(toClust,kmeans,method="silhouette",iter.max=iter.max,nstart=nstart,k.max=maxClusts) 
+    if(print){
+        grid.arrange(gpw,gps, nrow = 1)
+    }
+    list(wss=wss,pm1=pm1$nc,gpw=gpw,gps=gps)
+}
+
+checks = clustTest(partworths,print=TRUE,scale=TRUE,maxClusts=15,seed=12345,nstart=20,iter.max=100)</code></pre>
+                        <img src="images/toydata6.jpg" alt="" />
+                        
+                        <p>I then further looked at the cluster plots against Principle Components. The graph below clearly showed that 3 clusters would be the best scenario. </p>
+                        <pre><code>##### Choosing the optimal number of clusters #####
+
+##Runs a set of clusters as kmeans
+runClusts = function(toClust,nClusts,print=TRUE,maxClusts=15,seed=12345,nstart=20,iter.max=100){
+    if(length(nClusts)>4){
+        warning("Using only first 4 elements of nClusts.")
+    }
+    kms=list(); ps=list();
+    for(i in 1:4){
+        kms[[i]] = kmeans(toClust,nClusts[i],iter.max = iter.max, nstart=nstart)
+        ps[[i]] = fviz_cluster(kms[[i]], geom = "point", data = toClust) + ggtitle(paste("k =",nClusts[i]))
+    }
+    library(gridExtra)
+    if(print){
+        tmp = marrangeGrob(ps, nrow = 2,ncol=2)
+        print(tmp)
+    }
+    list(kms=kms,ps=ps)
+}
+
+clusts = runClusts(partworths,c(2,3,4,11),print=TRUE,maxClusts=15,seed=12345,nstart=20,iter.max=100)</code></pre>
+                        <img src="images/toydata7.jpg" alt="" />
+                        
+                        <p>Looking at the 3-cluster scenario in more depth, I found that customers of these three cluster take up 40%, 34% and 26% of the total sample respectively. </p>
+                        <pre><code>##### Benefit Segmentation via Cluster Analysis #####
+
+##Plots a kmeans cluster as three plot report
+plotClust = function(km,toClust,discPlot=FALSE){
+    nc = length(km$size)
+    if(discPlot){par(mfrow=c(2,2))}
+    else {par(mfrow=c(3,1))}
+    percsize = paste(1:nc," = ",format(km$size/sum(km$size)*100,digits=2),"%",sep="")
+    pie(km$size,labels=percsize,col=1:nc)
+    
+    clusplot(toClust, km$cluster, color=TRUE, shade=TRUE,
+             labels=2, lines=0,col.clus=1:nc); #plot clusters against principal components
+    
+    if(discPlot){
+        plotcluster(toClust, km$cluster,col=km$cluster); #plot against discriminant functions ()
+    }
+    rng = range(km$centers)
+    dist = rng[2]-rng[1]
+    locs = km$centers+.05*dist*ifelse(km$centers>0,1,-1)
+    bm = barplot(km$centers,beside=TRUE,col=1:nc,main="Cluster Means",ylim=rng+dist*c(-.1,.1))
+    text(bm,locs,formatC(km$centers,format="f",digits=1))
+}
+
+par(mar=c(2,2,2,2))
+plotClust(clusts[[1]][[2]],partworths)</code></pre>
+                        <img src="images/toydata8.jpg" alt="" />
+                        <p>At the same time, these 3 segments show quite different preference for each attribute, which we can see from the attribute utility means for each segment on the graph below. For price, all 3 segments gain higher utility in the lower price of 119.99 dollars, but at different levels. For size, segment 1 and 3 show preference for larger size of 26 inches, while segment 2 gain more utility in smaller size of 18 inches. Similar for the motion and style attributes. </p>
+                                               
+                        <img src="images/toydata9.jpg" alt="" />
+                        
+                        <p>Based on the cluster means, we can find out the ideal product for each of these 3 segments are profile 4,14,16 respectively. The characteristics of each post-hoc segment and detailed profile information are shown in the table below.</p>
+				        <div class="table-wrapper">
+								<table>
+									<thead>
+										<tr>
+											<th>Segment NO.</th>
+											<th>Characteristics</th>
+											<th>Ideal Product</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>1</td>
+											<td>Price sensitive, bouncing & racing style lover</td>
+											<td>Profile 4 ($119.99, 26’’, bouncing, racing)</td>
+										</tr>
+										<tr>
+											<td>2</td>
+											<td>Smaller size & rocking lover</td>
+											<td>Profile 14 ($119.99, 18’’, rocking, glamour)</td>
+										</tr>
+										<tr>
+											<td>3</td>
+											<td>Bigger size & glamourous style lover</td>
+											<td>Profile 16 ($119.99, 26’’, rocking, glamour)</td>
+										</tr>
+									</tbody>
+								</table>
+				        </div>
+                        
+                        <h3>Step2. A priori Segmentation using Gender and Age</h3>
+                        <p>Next, I conducted a priori segmentation using the variables age and gender, which generated four different segments. Based on the segment-level regression results, we can confirm the preference difference of different age and gender groups. </p>
+                    
+                        <pre><code>##### A priori Segmentation with age_gender#####
+
+coeflist=list()
+for(i in 1:4) {
+    reg = lm(ratings~factor(price)+factor(size)+factor(motion)+factor(style), 
+             data=merge_conjointData[merge_conjointData$age_gender==i,])
+    coeflist[[i]] = reg$coefficients
+}
+age_gender_partworths = as.data.frame(do.call(rbind, coeflist))
+colnames(age_gender_partworths)[2:5] = c('price119.99', 'size26inc','motionRocking', 'styleGlamour')
+age_gender_partworths$age_gender = c('2yrs,male','3-4yrs,male','2yrs,female','3-4yrs,female')
+age_gender_partworths
+</code></pre>
+                        <img src="images/toydata10.jpg" alt="" />
+                        <p>From the table above, we can see that girls show clear preference for rocking horse and glamorous style, while 3-4 year-old boys have higher utility in bouncing horse and racing style. We can also see that 2 year-old boys or girls have higher utility for rocking horse than the 3-4 year-olds. </p>
+                        <p>As for price and size, all 4 segments show high utility for lower price and bigger size, but at different levels. Girl on average have a higher utility for bigger size than boys. Both 3-4 year-old boys and girls prefer bigger size than their 2 year-old counterparts, which is quite intuitive given their age difference.</p>
+                        <p>According to these findings, we can tell the ideal product of these 4 segments are profile 4,8,16.</p>
+                        
+                        <div class="table-wrapper">
+								<table>
+									<thead>
+										<tr>
+											<th>Segment</th>
+											<th>Ideal Product</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>Male(3-4 yrs)</td>
+											<td>Profile 4 ($119.99, 26’’, bouncing, racing)</td>
+										</tr>
+										<tr>
+											<td>Male(2 yrs)</td>
+											<td>Profile 8 ($119.99, 26’’, rocking, racing)</td>
+										</tr>
+										<tr>
+											
+											<td>Female(2 yrs & 3-4 yrs)</td>
+											<td>Profile 16 ($119.99, 26’’, rocking, glamour)</td>
+										</tr>
+
+									</tbody>
+								</table>
+				        </div>
+                        
+                        
+                        <h3>Step3. Market Shares Simulation</h3>
+                        <p>After analyzing the customer segmentation, I ran several market simulations to determine the ideal product portfolio for the company in order to maximize the profit. </p>
+                        
+                        <h4>1. Current Scenario</h4>
+                        <p>Based on the conjoint data for different profiles, we can calculate the market share under different market scenarios and also the profit using given cost information. Currently the company launched 18 inches Rocking Glamour and the same size Rocking Racing horse at $119.99, which are Profile 5 and 13; while our competitor sells 26’’ Racing Rocking Horse at $139.99, which is Profile 7. Calculation results are shown in the chart below: now our two products account for 43% of total market share, yielding a profit of $95,000+ per year.</p>
+                        <img src="images/toydata11.jpg" alt="" />
+                        <h4>2. First Year</h4>
+                        <p>I then tried some other profiles for simulation. While it is a waste of time running all combinations of 16 profiles, I first selected Profiles 10, 12, 14 and 16, which have a lower price of $119.99, to replace our current ones. The reason is that from previous research we found consumers are price sensitive, and these four profiles are most likely to expand our market share. Assume the competitor keeps launching profile 7, changing product line to 26’’ Bouncing Glamour toy horse could gain highest market share and profit, which is nearly $220,000 per year; while our competitor’s market share would decrease to only 8% in this year.</p>
+                        <img src="images/toydata12.jpg" alt="" />
+                        <h4>3. Second Year</h4>
+                        <p>Given the competitor’s information, we know that our competitor would not change the product offering, but might respond by lowering price after the first year’s loss in market share.</p>
+                        <p>Therefore, I assumed the competitor changed from launching profile 7 to profile 8 in the second year. In this case, it’s reasonable to launch as many popular products as possible to shrink the competitor’s market share. Based on the result of our previous research of segmentation, profile 4 and 16 are the most popular toy horses and preferred by most children. Combining profile 4 and 16 with profile 12 that we launched in the first year, I rearranged these three profiles into three combinations X, Y and Z. Among these three combinations, Z has highest market share and largest profit. Therefore, launching profile 4 and 16 is the best scenario for the second year.</p>
+                        <img src="images/toydata13.jpg" alt="" />
+                        <h4>4. Long Run Consideration</h4>
+                        <p>Company’s long-run strategy would depend on whether competitor would respond to the market change immediately. If he didn’t respond until the second year as we expected, then the optimal revitalization plan for the company would be to change from Profiles 5, 13 to Profile 12 in the first year, and to Profiles 4, 16 after (26” Bouncing Racing Horse and 26” Rocking Glamour Horse.).</p>
+                        <pre><code>#####  Market Share Simulation #####
+
+simFCDecisions = function(scen,data){ 
+    inmkt = data[,scen] #construct the subsetted matrix of options
+    retlist=list()
+    for(i in 1:nrow(inmkt)){
+        maxvalue=max(inmkt[i,])
+        testmax=as.numeric(inmkt[i,]==maxvalue)
+        summax=sum(testmax)
+        ret=testmax/summax
+        retlist[[i]]=ret
+    }
+    ret = as.data.frame(do.call(rbind, retlist))
+    names(ret) <- names(inmkt)
+    ret
+}
+calcUnitShares = function(decisions){
+    colSums(decisions)/sum(decisions) #assumes that total decisions is market size
+}
+simFCShares=function(scen,data){
+    decs = simFCDecisions(scen,data) #determine decisions
+    calcUnitShares(decs) #calculate shares and return
+}
+simFCScenarios = function(scenarios,data,...){
+    res = matrix(nrow=length(scenarios),ncol=length(data)) #sets everything to NA by default
+    for(i in 1:length(scenarios)){ ##loop over scenarios
+        res[i, scenarios[[i]] ] = simFCShares(scenarios[[i]],data,...)##  calculate market shares and save to right columns in res for the scenario
+    }
+    res = as.data.frame(res); names(res) = names(data)
+    res ##return result table
+}
+
+### Profitablity anlysis
+# assign cost
+profilesData$vc <- c(rep(c(21,21,29,29,33,33,41,41),2))  # variable cost of each profile
+profilesData$wsprice <- c(rep(c(111.99,95.99),8)) # wholesale price of each profile
+profilesData$margin <- profilesData$wsprice - profilesData$vc # contribution margin of each profile
+
+simMargin = function(scen,data){ # calculate margin for each scenario
+    shares=simFCShares(scen,data)
+    margin=c()
+    for (i in 1:length(scen)){
+        margin <- c(margin,shares[i]*profilesData$margin[profilesData$profile == scen[i]]*4000)
+    }
+    margin
+} 
+simMarginScenarios = function(scenarios,data,...){ 
+    res = matrix(nrow=length(scenarios),ncol=length(data)) #sets everything to NA by default
+    for(i in 1:length(scenarios)){ ##loop over scenarios
+        res[i, scenarios[[i]] ] = simMargin(scenarios[[i]],data,...)##  calculate margin and save to right columns in res for the scenario
+    }
+    res = as.data.frame(res); names(res) = names(data)
+    res ##return result table
+}
+
+### Set up scenarios 
+scens = list()
+scens[[1]]=c(5,7,13) #  status quo: own product p5 & p13, competitor p7
+# first year scenarios
+scens[[2]]=c(7,10) # competitor p7(not change) + own p10
+scens[[3]]=c(7,12) # competitor p7(not change) + own p12 - profit max
+scens[[4]]=c(7,14) # competitor p7(not change) + own p14
+scens[[5]]=c(7,16) # competitor p7(not change) + own p16
+# second year scenarios
+scens[[6]]=c(4,8,12) # competitor change to p8 + own p12 plus p4
+scens[[7]]=c(8,12,16) # competitor change to p8 + own p12 plus p16
+scens[[8]]=c(4,8,16) # competitor change to p8 + own change to p4 & p16 - profit max
+
+
+### Market share and contribution margin for all scenarios
+simFCScenarios(scens,ratingData_wide[,2:17])  # market share 
+simMarginScenarios(scens,ratingData_wide[,2:17]) # contribution margin 
+</code></pre>
+                        
+                        <h2>Final Report</h2>
+                        <div class="box alt">
+								<div class="row gtr-50 gtr-uniform">
+									<div class="col-12"><span><img src="images/toyslides.jpg" alt="" /></span></div>
+				                </div>
+				        </div>
+                        <ul class="actions">
+							<li><a href="https://1drv.ms/p/s!AisVo4xptCcda5D5ahbQTqTFxAQ?e=anLwB5" class="button">View Full Slides</a></li>
+						</ul>
+                        
+                        <p><i>Key Words: R, Conjoint Analysis, Cluster Analysis, Benefit Segmentation, Market Simulation</i></p>
+				
+                        <ul class="actions">
+							<li><a href="index.html" class="button primary">Back to Home</a></li>
+                            <li><a href="projects.html" class="button primary">View Other Projects</a></li>
+						</ul>
+		           <hr /> 
+
+             <!-- Two -->
+					<section id="comment">
+						<h2>Comments</h2>
+                        <div class="col-8 col-12-small">
+								<form method="post" action="#">
+									<div class="row gtr-uniform gtr-50">
+										<div class="col-6 col-12-xsmall"><input type="text" name="name" id="name" placeholder="Name" /></div>
+										<div class="col-6 col-12-xsmall"><input type="email" name="email" id="email" placeholder="Email" /></div>
+										<div class="col-12"><textarea name="message" id="message" placeholder="Message" rows="4"></textarea></div>
+									</div>
+								</form>
+								<ul class="actions">
+									<li><input type="submit" value="Send Message" /></li>
+								</ul>
+				        </div>
+					</section>        
+                
+		<!-- Footer -->
+			<footer id="footer">
+				<div class="inner">
+					<ul class="icons">
+				        <li><a href="http://www.linkedin.com/in/shulianguan" class="icon brands fa-linkedin"><span class="label">LinkedIn</span></a></li>
+                        <li><a href="documents/Shulian.Guan.Resume.Oct2020.pdf" class="icon solid fa-file-pdf"><span class="label">Resume</span></a></li>
+						<li><a href="mailto:shulianguan@gmail.com" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
+					</ul>
+					<ul class="copyright">
+						<li>&copy; Shulian Guan</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+					</ul>
+				</div>
+			</footer>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.poptrox.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>
